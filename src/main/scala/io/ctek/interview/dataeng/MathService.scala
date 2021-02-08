@@ -1,29 +1,29 @@
 package io.ctek.interview.dataeng
 
-import cats.data.{Kleisli, ReaderT}
-import cats.instances.try_._
-import scala.util.Try
+import cats.effect.Sync
+import cats.implicits._
 
 case class DataEnvironment(data: Set[Int])
 
-class MathService {
-  def gcd: ReaderT[Try, DataEnvironment, Either[String, Int]] = for {
-    data <- retrieveData
-  } yield data.map(_.reduceLeft(gcd))
+class MathService[F[_]](implicit F: Sync[F]) {
 
-  def gcd(a: Int, b: Int): Int = b match {
-    case 0 => a
-    case _ => gcd(b, a % b)
-  }
+  def retrieveData(
+                    env: DataEnvironment
+                  ): F[Either[String, Set[Int]]] =
+    if (env.data.size == 1 && env.data.contains(0)) {
+      F.delay(Left("gcd of 0 is undefined"))
+    } else {
+      F.delay(Right(env.data))
+    }
 
-  def retrieveData: ReaderT[Try, DataEnvironment, Either[String, Set[Int]]] = Kleisli {
-    (env) =>
-      Try {
-        if (env.data.size == 1 && env.data.contains(0)) {
-          Left("gcd of 0 is undefined")
-        } else {
-          Right(env.data)
-        }
-      }
-  }
+  private def gcd(a: Int, b: Int): Int =
+    b match {
+      case 0 => a
+      case _ => gcd(b, a % b)
+    }
+
+  def gcd(data: DataEnvironment): F[Either[String, Int]] =
+    retrieveData(data)
+      .map(_.map(_.reduceLeft(gcd)))
+
 }
